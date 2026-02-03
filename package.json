@@ -1,0 +1,38 @@
+{
+  "name": "@clawguard/core",
+  "version": "0.1.0",
+  "description": "Security layer for OpenClaw - protect against prompt injection, secure sensitive files, and audit agent activity",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src --ext .ts",
+    "dev": "ts-node src/index.ts"
+  },
+  "keywords": [
+    "openclaw",
+    "security",
+    "prompt-injection",
+    "ai-safety",
+    "mcp"
+  ],
+  "author": "MoltPill",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.11.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "eslint": "^8.56.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "yaml": "^2.3.4"
+  }
+}
