@@ -3,7 +3,7 @@
 ### Security Layer for AI Agents That Actually Works
 
 [![npm version](https://img.shields.io/npm/v/@clawguard/core.svg?style=flat-square&color=blue)](https://www.npmjs.com/package/@clawguard/core)
-[![Tests](https://img.shields.io/badge/tests-333%20passing-brightgreen?style=flat-square)](https://github.com/moltpill/openclaw-security)
+[![Tests](https://img.shields.io/badge/tests-333%20passing-brightgreen?style=flat-square)](https://github.com/moltpill/clawguard)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 
@@ -249,8 +249,8 @@ We welcome contributions! Here's how to get started:
 
 ```bash
 # Clone the repo
-git clone https://github.com/moltpill/openclaw-security.git
-cd openclaw-security
+git clone https://github.com/moltpill/clawguard.git
+cd clawguard
 
 # Install dependencies
 npm install
@@ -282,7 +282,7 @@ MIT © [MoltPill](https://github.com/moltpill)
 </p>
 
 <p align="center">
-  <a href="https://github.com/moltpill/openclaw-security">GitHub</a> •
-  <a href="https://github.com/moltpill/openclaw-security/issues">Issues</a> •
-  <a href="https://github.com/moltpill/openclaw-security/discussions">Discussions</a>
+  <a href="https://github.com/moltpill/clawguard">GitHub</a> •
+  <a href="https://github.com/moltpill/clawguard/issues">Issues</a> •
+  <a href="https://github.com/moltpill/clawguard/discussions">Discussions</a>
 </p>

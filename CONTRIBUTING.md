@@ -1,4 +1,4 @@
-# Contributing to ClawGuard (openclaw-security)
+# Contributing to ClawGuard (clawguard)
 
 Thank you for your interest in contributing! This document provides guidelines for contributing to the project.
 
@@ -6,15 +6,15 @@ Thank you for your interest in contributing! This document provides guidelines f
 
 ### 1. Fork the Repository
 
-1. Click the "Fork" button on [github.com/moltpill/openclaw-security](https://github.com/moltpill/openclaw-security)
+1. Click the "Fork" button on [github.com/moltpill/clawguard](https://github.com/moltpill/clawguard)
 2. Clone your fork locally:
    ```bash
-   git clone https://github.com/YOUR-USERNAME/openclaw-security.git
-   cd openclaw-security
+   git clone https://github.com/YOUR-USERNAME/clawguard.git
+   cd clawguard
    ```
 3. Add the upstream remote:
    ```bash
-   git remote add upstream https://github.com/moltpill/openclaw-security.git
+   git remote add upstream https://github.com/moltpill/clawguard.git
    ```
 
 ### 2. Create a Feature Branch
