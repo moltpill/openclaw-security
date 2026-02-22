@@ -42,39 +42,33 @@ const c = colors;
 
 // ============ ASCII Art Banner ============
 function getBanner(): string {
-  // Cyberpunk pharmacy shield - Matrix meets medical precision
+  // Compact cyberpunk shield - fits in ~45 chars
   return `
-${c.cyan}    ╔═══════════════════════════════════════════════════════════════╗
-    ║${c.reset}                                                                 ${c.cyan}║
-    ║${c.brightCyan}       ██████╗██╗      █████╗ ██╗    ██╗ ██████╗ ██╗   ██╗${c.cyan}       ║
-    ║${c.brightCyan}      ██╔════╝██║     ██╔══██╗██║    ██║██╔════╝ ██║   ██║${c.cyan}       ║
-    ║${c.brightCyan}      ██║     ██║     ███████║██║ █╗ ██║██║  ███╗██║   ██║${c.cyan}       ║
-    ║${c.brightCyan}      ██║     ██║     ██╔══██║██║███╗██║██║   ██║██║   ██║${c.cyan}       ║
-    ║${c.brightCyan}      ╚██████╗███████╗██║  ██║╚███╔███╔╝╚██████╔╝╚██████╔╝${c.cyan}       ║
-    ║${c.brightCyan}       ╚═════╝╚══════╝╚═╝  ╚═╝ ╚══╝╚══╝  ╚═════╝  ╚═════╝${c.cyan}        ║
-    ║${c.reset}                                                                 ${c.cyan}║
-    ║${c.reset}     ${c.brightMagenta}╭─────────────╮${c.reset}      ${c.brightGreen}┏━━━━━━━━━━━━━━━━━━━━━━━━━┓${c.reset}     ${c.cyan}║
-    ║${c.reset}     ${c.brightMagenta}│  ◢██████◣  │${c.reset}      ${c.brightGreen}┃${c.reset}   ${c.bold}${c.white}SECURITY LAYER FOR${c.reset}     ${c.brightGreen}┃${c.reset}     ${c.cyan}║
-    ║${c.reset}     ${c.brightMagenta}│ ███${c.white}💊${c.brightMagenta}███ │${c.reset}      ${c.brightGreen}┃${c.reset}   ${c.bold}${c.white}OPENCLAW AGENTS${c.reset}        ${c.brightGreen}┃${c.reset}     ${c.cyan}║
-    ║${c.reset}     ${c.brightMagenta}│  ◥██████◤  │${c.reset}      ${c.brightGreen}┗━━━━━━━━━━━━━━━━━━━━━━━━━┛${c.reset}     ${c.cyan}║
-    ║${c.reset}     ${c.brightMagenta}│  ◥██████◤  │${c.reset}                                    ${c.cyan}║
-    ║${c.reset}     ${c.brightMagenta}│   ◥████◤   │${c.reset}      ${c.dim}Protect • Detect • Audit${c.reset}       ${c.cyan}║
-    ║${c.reset}     ${c.brightMagenta}╰─────────────╯${c.reset}                                    ${c.cyan}║
-    ║${c.reset}                                                                 ${c.cyan}║
-    ║${c.reset}     ${c.dim}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${c.reset}     ${c.cyan}║
-    ║${c.reset}     ${c.brightYellow}⚡${c.reset} ${c.bold}MoltPill Security${c.reset}                     ${c.dim}v${VERSION}${c.reset}     ${c.cyan}║
-    ╚═══════════════════════════════════════════════════════════════╝${c.reset}
+${c.cyan}╔════════════════════════════════════════╗
+║${c.reset}                                        ${c.cyan}║
+║${c.reset}      ${c.brightMagenta}◢███████◣${c.reset}                       ${c.cyan}║
+║${c.reset}     ${c.brightMagenta}███${c.reset} ${c.white}💊${c.reset} ${c.brightMagenta}███${c.reset}   ${c.bold}${c.white}CLAWGUARD${c.reset}          ${c.cyan}║
+║${c.reset}      ${c.brightMagenta}◥█████◤${c.reset}    ${c.dim}v${VERSION}${c.reset}             ${c.cyan}║
+║${c.reset}       ${c.brightMagenta}◥███◤${c.reset}                         ${c.cyan}║
+║${c.reset}        ${c.brightMagenta}◥█◤${c.reset}      ${c.dim}Security Layer${c.reset}        ${c.cyan}║
+║${c.reset}                 ${c.dim}for OpenClaw${c.reset}          ${c.cyan}║
+║${c.reset}                                        ${c.cyan}║
+║${c.reset}  ${c.brightGreen}┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${c.reset}  ${c.cyan}║
+║${c.reset}  ${c.brightGreen}┃${c.reset}  ${c.cyan}Protect${c.reset} ${c.dim}·${c.reset} ${c.yellow}Detect${c.reset} ${c.dim}·${c.reset} ${c.magenta}Audit${c.reset}       ${c.brightGreen}┃${c.reset}  ${c.cyan}║
+║${c.reset}  ${c.brightGreen}┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${c.reset}  ${c.cyan}║
+║${c.reset}                                        ${c.cyan}║
+║${c.reset}  ${c.brightYellow}⚡${c.reset} ${c.bold}MoltPill${c.reset}                          ${c.cyan}║
+╚════════════════════════════════════════╝${c.reset}
 `;
 }
 
 // Compact banner for status command
 function getCompactBanner(): string {
   return `
-${c.cyan}╔═══════════════════════════════════════════════════════════╗
-║${c.reset}  ${c.brightMagenta}◢██◣${c.reset}  ${c.brightCyan}${c.bold}CLAWGUARD${c.reset} ${c.dim}— Security Layer for OpenClaw${c.reset}  ${c.dim}v${VERSION}${c.reset}  ${c.cyan}║
-║${c.reset}  ${c.brightMagenta}█${c.white}💊${c.brightMagenta}█${c.reset}  ${c.dim}Protect your agents from prompt injection${c.reset}       ${c.cyan}║
-║${c.reset}  ${c.brightMagenta}◥██◤${c.reset}                                                     ${c.cyan}║
-╚═══════════════════════════════════════════════════════════╝${c.reset}
+${c.cyan}┌────────────────────────────────────────┐
+│${c.reset}  ${c.brightMagenta}◢█◣${c.reset} ${c.brightCyan}${c.bold}CLAWGUARD${c.reset} ${c.dim}v${VERSION}${c.reset}               ${c.cyan}│
+│${c.reset}  ${c.brightMagenta}◥█◤${c.reset} ${c.dim}Security for OpenClaw Agents${c.reset}      ${c.cyan}│
+└────────────────────────────────────────┘${c.reset}
 `;
 }
 
