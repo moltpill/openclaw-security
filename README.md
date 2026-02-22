@@ -92,14 +92,21 @@ clawguard status
 ClawGuard comes with a beautiful terminal interface:
 
 ```
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║       ██████╗██╗      █████╗ ██╗    ██╗ ██████╗ ██╗   ██╗     ║
-    ║      ██╔════╝██║     ██╔══██╗██║    ██║██╔════╝ ██║   ██║     ║
-    ║      ██║     ██║     ███████║██║ █╗ ██║██║  ███╗██║   ██║     ║
-    ║      ██║     ██║     ██╔══██║██║███╗██║██║   ██║██║   ██║     ║
-    ║      ╚██████╗███████╗██║  ██║╚███╔███╔╝╚██████╔╝╚██████╔╝     ║
-    ║       ╚═════╝╚══════╝╚═╝  ╚═╝ ╚══╝╚══╝  ╚═════╝  ╚═════╝     ║
-    ╚═══════════════════════════════════════════════════════════════╝
+╔════════════════════════════════════════╗
+║                                        ║
+║      ◢███████◣                         ║
+║     ███ 💊 ███   CLAWGUARD             ║
+║      ◥█████◤    v0.1.0                 ║
+║       ◥███◤                            ║
+║        ◥█◤      Security Layer         ║
+║                 for OpenClaw           ║
+║                                        ║
+║  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓  ║
+║  ┃  Protect · Detect · Audit       ┃  ║
+║  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛  ║
+║                                        ║
+║  ⚡ MoltPill                           ║
+╚════════════════════════════════════════╝
 ```
 
 ### Available Commands
@@ -120,6 +127,22 @@ ClawGuard comes with a beautiful terminal interface:
 ```bash
 # View current security status
 $ clawguard status
+┌────────────────────────────────────────┐
+│  ◢█◣ CLAWGUARD v0.1.0                  │
+│  ◥█◤ Security for OpenClaw Agents      │
+└────────────────────────────────────────┘
+
+Config: ~/.openclaw/clawguard.yaml
+
+InjectionShield  ✓ ACTIVE
+  ├ Sensitivity: MEDIUM — Balanced detection (recommended)
+SecretScanner    ✓ ACTIVE
+SecureEnclave    ✓ ACTIVE
+  ├ Protected: SOUL.md, USER.md, secrets/*
+SelfModGuard     ✓ ACTIVE
+  ├ Mode: Require approval
+AuditLogger      ✓ ACTIVE
+  ├ Log: ~/.openclaw/logs/clawguard.jsonl
 
 # Set aggressive security mode
 $ clawguard level high
