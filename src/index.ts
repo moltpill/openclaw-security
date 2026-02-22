@@ -56,3 +56,22 @@ export type {
   RequestApprovalResult,
   ProcessResponseResult
 } from './approval';
+
+// OpenClaw Plugin
+export { 
+  clawguardPlugin, 
+  clawguardPlugin as default 
+} from './plugin';
+export type { 
+  OpenClawPluginApi,
+  PluginRegistrationResult,
+  ClawGuardPluginConfig 
+} from './plugin';
+export { 
+  ClawGuardPluginConfigSchema, 
+  DEFAULT_CONFIG, 
+  resolveConfig,
+  BLOCKED_CATEGORIES,
+  type BlockedCategory,
+  type ClawGuardPluginConfigInput,
+} from './plugin/config';

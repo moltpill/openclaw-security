@@ -1,0 +1,12 @@
+{
+  "id": "clawguard",
+  "name": "ClawGuard Security",
+  "version": "0.1.0",
+  "description": "Security layer for OpenClaw agents - injection detection, secret scanning, enclave protection, and audit logging",
+  "entry": "./dist/plugin/index.js",
+  "hooks": ["message:before", "tool:before", "file:before"],
+  "author": "MoltPill",
+  "license": "MIT",
+  "homepage": "https://github.com/moltpill/clawguard",
+  "keywords": ["security", "injection", "secrets", "audit"]
+}
