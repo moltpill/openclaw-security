@@ -1,5 +1,5 @@
 {
-  "name": "@clawguard/core",
+  "name": "@moltpill/clawguard",
   "version": "0.1.0",
   "description": "Security layer for OpenClaw - protect against prompt injection, secure sensitive files, and audit agent activity",
   "main": "dist/index.js",
@@ -34,5 +34,13 @@
   },
   "dependencies": {
     "yaml": "^2.3.4"
-  }
+  },
+  "bin": {
+    "clawguard": "./dist/cli/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ]
 }
