@@ -2,7 +2,6 @@
  * Tool Guard Hook Tests
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createToolGuardHook, ToolHookContext } from '../../src/plugin/hooks/tool-guard';
 import { ClawGuard } from '../../src/clawguard';
 import { ClawGuardPluginConfig, DEFAULT_CONFIG } from '../../src/plugin/config';
@@ -12,14 +11,14 @@ describe('ToolGuardHook', () => {
   let config: ClawGuardPluginConfig;
 
   beforeEach(() => {
-    config = { ...DEFAULT_CONFIG };
+    config = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
     mockGuard = {
-      checkSelfModification: vi.fn().mockReturnValue({
+      checkSelfModification: jest.fn().mockReturnValue({
         blocked: false,
         requiresApproval: false,
         reason: '',
       }),
-      checkTool: vi.fn().mockReturnValue({
+      checkTool: jest.fn().mockReturnValue({
         allowed: true,
         action: 'allow',
         reason: 'Policy allows this tool',
@@ -47,7 +46,7 @@ describe('ToolGuardHook', () => {
     });
 
     it('should block dangerous self-modification attempts', async () => {
-      mockGuard.checkSelfModification = vi.fn().mockReturnValue({
+      mockGuard.checkSelfModification = jest.fn().mockReturnValue({
         blocked: true,
         requiresApproval: false,
         reason: 'Cannot modify agent installation',
@@ -74,7 +73,7 @@ describe('ToolGuardHook', () => {
 
     it('should request approval for self-modification when configured', async () => {
       config.selfModification.requireApproval = true;
-      mockGuard.checkSelfModification = vi.fn().mockReturnValue({
+      mockGuard.checkSelfModification = jest.fn().mockReturnValue({
         blocked: true,
         requiresApproval: true,
         reason: 'Gateway control requires approval',
@@ -149,7 +148,7 @@ describe('ToolGuardHook', () => {
     });
 
     it('should block tools that fail policy check', async () => {
-      mockGuard.checkTool = vi.fn().mockReturnValue({
+      mockGuard.checkTool = jest.fn().mockReturnValue({
         allowed: false,
         action: 'block',
         reason: 'Tool disabled by policy',
@@ -171,7 +170,7 @@ describe('ToolGuardHook', () => {
     });
 
     it('should request approval for tools requiring it', async () => {
-      mockGuard.checkTool = vi.fn().mockReturnValue({
+      mockGuard.checkTool = jest.fn().mockReturnValue({
         allowed: false,
         action: 'require_approval',
         reason: 'Message sending requires approval',

@@ -2,7 +2,6 @@
  * Message Shield Hook Tests
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createMessageShieldHook, MessageHookContext } from '../../src/plugin/hooks/message-shield';
 import { ClawGuard } from '../../src/clawguard';
 import { ClawGuardPluginConfig, DEFAULT_CONFIG } from '../../src/plugin/config';
@@ -13,9 +12,9 @@ describe('MessageShieldHook', () => {
   let config: ClawGuardPluginConfig;
 
   beforeEach(() => {
-    config = { ...DEFAULT_CONFIG };
+    config = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
     mockGuard = {
-      scanMessage: vi.fn().mockReturnValue({
+      scanMessage: jest.fn().mockReturnValue({
         safe: true,
         threatLevel: ThreatLevel.NONE,
         threats: [],
@@ -67,7 +66,7 @@ describe('MessageShieldHook', () => {
     });
 
     it('should block messages when scan returns block action', async () => {
-      mockGuard.scanMessage = vi.fn().mockReturnValue({
+      mockGuard.scanMessage = jest.fn().mockReturnValue({
         safe: false,
         threatLevel: ThreatLevel.HIGH,
         threats: [{ pattern: 'injection-attempt' }],
@@ -94,7 +93,7 @@ describe('MessageShieldHook', () => {
     });
 
     it('should warn but allow messages when scan returns warn action', async () => {
-      mockGuard.scanMessage = vi.fn().mockReturnValue({
+      mockGuard.scanMessage = jest.fn().mockReturnValue({
         safe: false,
         threatLevel: ThreatLevel.MEDIUM,
         threats: [{ pattern: 'suspicious-content' }],
@@ -121,7 +120,7 @@ describe('MessageShieldHook', () => {
 
     it('should redact content when scanner is in redact mode', async () => {
       config.scanner.onDetection = 'redact';
-      mockGuard.scanMessage = vi.fn().mockReturnValue({
+      mockGuard.scanMessage = jest.fn().mockReturnValue({
         safe: true,
         threatLevel: ThreatLevel.LOW,
         threats: [],

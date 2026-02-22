@@ -2,7 +2,6 @@
  * File Watch Hook Tests
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createFileWatchHook, FileHookContext } from '../../src/plugin/hooks/file-watch';
 import { ClawGuard } from '../../src/clawguard';
 import { ClawGuardPluginConfig, DEFAULT_CONFIG } from '../../src/plugin/config';
@@ -12,10 +11,10 @@ describe('FileWatchHook', () => {
   let config: ClawGuardPluginConfig;
 
   beforeEach(() => {
-    config = { ...DEFAULT_CONFIG };
+    config = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
     mockGuard = {
-      isProtectedFile: vi.fn().mockReturnValue(false),
-      scanContent: vi.fn().mockReturnValue({
+      isProtectedFile: jest.fn().mockReturnValue(false),
+      scanContent: jest.fn().mockReturnValue({
         safe: true,
         action: 'allow',
       }),
@@ -26,7 +25,7 @@ describe('FileWatchHook', () => {
     it('should block writes to protected files without approval', async () => {
       config.enclave.enabled = true;
       config.enclave.requireApproval = false;
-      mockGuard.isProtectedFile = vi.fn().mockReturnValue(true);
+      mockGuard.isProtectedFile = jest.fn().mockReturnValue(true);
 
       const hook = createFileWatchHook(mockGuard as ClawGuard, config);
 
@@ -51,7 +50,7 @@ describe('FileWatchHook', () => {
     it('should request approval for writes to protected files when configured', async () => {
       config.enclave.enabled = true;
       config.enclave.requireApproval = true;
-      mockGuard.isProtectedFile = vi.fn().mockReturnValue(true);
+      mockGuard.isProtectedFile = jest.fn().mockReturnValue(true);
 
       const hook = createFileWatchHook(mockGuard as ClawGuard, config);
 
@@ -72,7 +71,7 @@ describe('FileWatchHook', () => {
 
     it('should block deletes to protected files', async () => {
       config.enclave.enabled = true;
-      mockGuard.isProtectedFile = vi.fn().mockReturnValue(true);
+      mockGuard.isProtectedFile = jest.fn().mockReturnValue(true);
 
       const hook = createFileWatchHook(mockGuard as ClawGuard, config);
 
@@ -89,7 +88,7 @@ describe('FileWatchHook', () => {
 
     it('should allow writes to unprotected files', async () => {
       config.enclave.enabled = true;
-      mockGuard.isProtectedFile = vi.fn().mockReturnValue(false);
+      mockGuard.isProtectedFile = jest.fn().mockReturnValue(false);
 
       const hook = createFileWatchHook(mockGuard as ClawGuard, config);
 
@@ -106,7 +105,7 @@ describe('FileWatchHook', () => {
 
     it('should skip enclave check when disabled', async () => {
       config.enclave.enabled = false;
-      mockGuard.isProtectedFile = vi.fn().mockReturnValue(true);
+      mockGuard.isProtectedFile = jest.fn().mockReturnValue(true);
 
       const hook = createFileWatchHook(mockGuard as ClawGuard, config);
 
@@ -127,7 +126,7 @@ describe('FileWatchHook', () => {
     it('should block writes containing secrets when onDetection is block', async () => {
       config.scanner.enabled = true;
       config.scanner.onDetection = 'block';
-      mockGuard.scanContent = vi.fn().mockReturnValue({
+      mockGuard.scanContent = jest.fn().mockReturnValue({
         safe: false,
         action: 'block',
       });
@@ -150,7 +149,7 @@ describe('FileWatchHook', () => {
     it('should redact secrets when onDetection is redact', async () => {
       config.scanner.enabled = true;
       config.scanner.onDetection = 'redact';
-      mockGuard.scanContent = vi.fn().mockReturnValue({
+      mockGuard.scanContent = jest.fn().mockReturnValue({
         safe: false,
         action: 'warn',
         redactedContent: '{ "apiKey": "[REDACTED]" }',
@@ -174,7 +173,7 @@ describe('FileWatchHook', () => {
     it('should warn but allow when onDetection is warn', async () => {
       config.scanner.enabled = true;
       config.scanner.onDetection = 'warn';
-      mockGuard.scanContent = vi.fn().mockReturnValue({
+      mockGuard.scanContent = jest.fn().mockReturnValue({
         safe: false,
         action: 'warn',
       });
@@ -196,7 +195,7 @@ describe('FileWatchHook', () => {
     it('should allow without warning when onDetection is allow', async () => {
       config.scanner.enabled = true;
       config.scanner.onDetection = 'allow';
-      mockGuard.scanContent = vi.fn().mockReturnValue({
+      mockGuard.scanContent = jest.fn().mockReturnValue({
         safe: false,
         action: 'allow',
       });
@@ -246,7 +245,7 @@ describe('FileWatchHook', () => {
 
       // Reads should pass through with metadata indicating will-scan
       expect(result.continue).toBe(true);
-      expect(result.metadata?.clawguard?.willScan).toBe(true);
+      expect((result.metadata?.clawguard as Record<string, unknown>)?.willScan).toBe(true);
     });
   });
 
@@ -255,7 +254,7 @@ describe('FileWatchHook', () => {
       config.enclave.enabled = true;
       config.scanner.enabled = true;
       config.enclave.requireApproval = true;
-      mockGuard.isProtectedFile = vi.fn().mockReturnValue(true);
+      mockGuard.isProtectedFile = jest.fn().mockReturnValue(true);
 
       const hook = createFileWatchHook(mockGuard as ClawGuard, config);
 
@@ -277,8 +276,8 @@ describe('FileWatchHook', () => {
       config.enclave.enabled = true;
       config.scanner.enabled = true;
       config.scanner.onDetection = 'warn';
-      mockGuard.isProtectedFile = vi.fn().mockReturnValue(false);
-      mockGuard.scanContent = vi.fn().mockReturnValue({
+      mockGuard.isProtectedFile = jest.fn().mockReturnValue(false);
+      mockGuard.scanContent = jest.fn().mockReturnValue({
         safe: false,
         action: 'warn',
       });
