@@ -12,7 +12,9 @@ import {
   ClawGuardPluginConfigInput,
   DEFAULT_CONFIG,
   resolveConfig,
+  applyWorkspaceDetection,
 } from './config';
+import { registerCli } from './cli';
 import { createMessageShieldHook } from './hooks/message-shield';
 import { createToolGuardHook } from './hooks/tool-guard';
 import { createFileWatchHook } from './hooks/file-watch';
@@ -42,6 +44,9 @@ export interface OpenClawPluginApi {
   
   /** Get workspace path */
   getWorkspacePath(): string;
+  
+  /** Register CLI commands (optional) */
+  registerCli?(handler: (ctx: { program: any }) => void): void;
 }
 
 /**
@@ -80,7 +85,17 @@ export const clawguardPlugin = {
   async register(api: OpenClawPluginApi): Promise<PluginRegistrationResult> {
     // Get plugin configuration (with defaults)
     const userConfig = api.getConfig<ClawGuardPluginConfigInput>() || {};
-    const config = resolveConfig(userConfig);
+    let config = resolveConfig(userConfig);
+    
+    // Apply workspace auto-detection for protected files
+    const workspacePath = api.getWorkspacePath();
+    config = applyWorkspaceDetection(config, workspacePath);
+    
+    // Register CLI commands if available
+    if (api.registerCli) {
+      registerCli(api);
+      api.log('debug', 'ClawGuard CLI commands registered');
+    }
     
     api.log('info', 'ClawGuard initializing...', { config });
     
@@ -197,9 +212,16 @@ export {
   ClawGuardPluginConfigSchema, 
   DEFAULT_CONFIG, 
   resolveConfig,
+  applyWorkspaceDetection,
+  detectWorkspaceFiles,
+  mergeProtectedFiles,
+  expandPath,
   BLOCKED_CATEGORIES,
   type BlockedCategory,
 } from './config';
+
+// Re-export CLI registration
+export { registerCli } from './cli';
 
 // Re-export hook types
 export type { MessageHookContext, MessageHookResult } from './hooks/message-shield';

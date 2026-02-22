@@ -71,7 +71,14 @@ export {
   ClawGuardPluginConfigSchema, 
   DEFAULT_CONFIG, 
   resolveConfig,
+  applyWorkspaceDetection,
+  detectWorkspaceFiles,
+  mergeProtectedFiles,
+  expandPath,
   BLOCKED_CATEGORIES,
   type BlockedCategory,
   type ClawGuardPluginConfigInput,
 } from './plugin/config';
+
+// CLI registration
+export { registerCli } from './plugin/cli';
