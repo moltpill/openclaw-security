@@ -1,0 +1,26 @@
+# CODEOWNERS for openclaw-security (ClawGuard)
+# These owners will be automatically requested for review on PRs
+
+# Global ownership - all files
+* @moltpill
+
+# Core security modules
+/src/ @moltpill
+/lib/ @moltpill
+
+# Configuration files
+*.json @moltpill
+*.yaml @moltpill
+*.yml @moltpill
+*.toml @moltpill
+
+# Documentation
+/docs/ @moltpill
+*.md @moltpill
+
+# CI/CD and workflows
+/.github/ @moltpill
+
+# Tests
+/tests/ @moltpill
+/test/ @moltpill
