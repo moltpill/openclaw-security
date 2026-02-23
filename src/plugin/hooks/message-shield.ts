@@ -1,131 +1,69 @@
 /**
  * Message Shield Hook
- * 
- * Implements the message:before hook for scanning inbound messages
+ *
+ * Handles the message_received hook for scanning inbound messages
  * for injection attempts and other threats.
+ *
+ * NOTE: message_received is read-only in the current OpenClaw SDK.
+ * Threats are logged and audited but cannot block the message mid-flight.
+ * Blocking support requires future SDK approval API.
  */
 
 import { ClawGuard } from '../../clawguard';
 import { ClawGuardPluginConfig } from '../config';
-import { ThreatLevel } from '../../types';
+import type { PluginLogger } from '../sdk-types';
 
 /**
- * Context provided by OpenClaw for message:before hook
+ * Context shape for the message_received hook (matches real OpenClaw SDK).
  */
-export interface MessageHookContext {
-  message: {
-    content: string;
-    senderId?: string;
-    isExternal?: boolean;
-  };
-  channel: {
-    id: string;
-    type?: string;
-  };
-  session?: {
-    id: string;
-  };
-}
-
-/**
- * Result returned from the hook
- */
-export interface MessageHookResult {
-  /** Whether to continue processing the message */
-  continue: boolean;
-  /** Modified context (if any) */
-  context?: MessageHookContext;
-  /** Error to throw if blocking */
-  error?: Error;
-  /** Warning message to log */
-  warning?: string;
-  /** Metadata to attach */
+export interface MessageReceivedEvent {
+  from: string;
+  content: string;
+  timestamp?: number;
   metadata?: Record<string, unknown>;
 }
 
 /**
- * Creates the message:before hook handler
+ * Creates the message_received hook handler.
  */
 export function createMessageShieldHook(
   guard: ClawGuard,
-  config: ClawGuardPluginConfig
+  config: ClawGuardPluginConfig,
+  logger: PluginLogger,
 ) {
-  return async (ctx: MessageHookContext): Promise<MessageHookResult> => {
-    // Skip if shield is disabled
-    if (!config.shield.enabled) {
-      return { continue: true };
-    }
+  return async (event: MessageReceivedEvent, _ctx?: unknown): Promise<void> => {
+    if (!config.shield.enabled) return;
 
-    // Scan the message
-    const result = guard.scanMessage(ctx.message.content, {
-      channel: ctx.channel.id,
-      senderId: ctx.message.senderId,
-      isExternal: ctx.message.isExternal ?? true,
-      sessionId: ctx.session?.id,
+    const result = guard.scanMessage(event.content, {
+      channel: (event.metadata?.['channelId'] as string | undefined) ?? 'unknown',
+      senderId: event.from,
+      isExternal: true,
+      sessionId: (event.metadata?.['sessionKey'] as string | undefined),
     });
 
-    // Handle based on result
     if (result.action === 'block') {
-      return {
-        continue: false,
-        error: new Error(
-          `Message blocked by ClawGuard: ${result.threats.map(t => t.pattern).join(', ')}`
-        ),
-        metadata: {
-          clawguard: {
-            blocked: true,
-            threatLevel: result.threatLevel,
-            threats: result.threats,
-          },
-        },
-      };
+      // Read-only: cannot block, but log at error level and audit
+      logger.error(
+        `ClawGuard: Injection detected in message from ${event.from} — ` +
+          result.threats.map((t) => t.pattern).join(', '),
+        { threatLevel: result.threatLevel, threats: result.threats },
+      );
+      return;
     }
 
     if (result.action === 'warn') {
-      // Allow but warn
-      return {
-        continue: true,
-        warning: `ClawGuard detected potential threats: ${result.threats.map(t => t.pattern).join(', ')}`,
-        metadata: {
-          clawguard: {
-            warned: true,
-            threatLevel: result.threatLevel,
-            threats: result.threats,
-          },
-        },
-      };
+      logger.warn(
+        `ClawGuard: Potential threat in message from ${event.from} — ` +
+          result.threats.map((t) => t.pattern).join(', '),
+        { threatLevel: result.threatLevel, threats: result.threats },
+      );
+      return;
     }
 
-    // Check if we should use redacted content
-    if (result.redactedContent && config.scanner.onDetection === 'redact') {
-      return {
-        continue: true,
-        context: {
-          ...ctx,
-          message: {
-            ...ctx.message,
-            content: result.redactedContent,
-          },
-        },
-        metadata: {
-          clawguard: {
-            redacted: true,
-            originalLength: ctx.message.content.length,
-          },
-        },
-      };
-    }
-
-    // All clear
-    return {
-      continue: true,
-      metadata: {
-        clawguard: {
-          scanned: true,
-          threatLevel: result.threatLevel,
-          safe: result.safe,
-        },
-      },
-    };
+    // All clear — debug log only
+    logger.debug?.('ClawGuard: Message scanned, no threats detected', {
+      from: event.from,
+      threatLevel: result.threatLevel,
+    });
   };
 }

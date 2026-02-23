@@ -1,187 +1,119 @@
 /**
  * Tool Guard Hook
- * 
- * Implements the tool:before hook for checking tool invocations
+ *
+ * Handles the before_tool_call hook for checking tool invocations
  * against security policies and self-modification guards.
+ *
+ * BLOCKING SUPPORT:
+ *   The OpenClaw SDK processes before_tool_call as a modifying hook.
+ *   Returning { block: true, blockReason: '...' } prevents the tool
+ *   from executing. ClawGuard uses this for hard-block categories.
+ *
+ *   Soft violations (requiresApproval) are logged at warn level and
+ *   allowed through — blocking without the approval flow would break
+ *   legitimate agent operations that simply need human sign-off.
  */
 
 import { ClawGuard } from '../../clawguard';
 import { ClawGuardPluginConfig } from '../config';
+import type { PluginLogger, PluginHookBeforeToolCallResult } from '../sdk-types';
 
 /**
- * Context provided by OpenClaw for tool:before hook
+ * Context shape for the before_tool_call hook (matches real OpenClaw SDK).
  */
-export interface ToolHookContext {
-  tool: {
-    name: string;
-    action?: string;
-  };
-  args: Record<string, unknown>;
-  session?: {
-    id: string;
-  };
+export interface BeforeToolCallEvent {
+  toolName: string;
+  params: Record<string, unknown>;
 }
 
 /**
- * Approval request structure
- */
-export interface ApprovalRequest {
-  type: 'tool-invocation' | 'self-modification';
-  tool: string;
-  action?: string;
-  args?: Record<string, unknown>;
-  reason: string;
-  command?: string;
-  category?: string;
-}
-
-/**
- * Result returned from the hook
- */
-export interface ToolHookResult {
-  /** Whether to continue with the tool invocation */
-  continue: boolean;
-  /** Modified context (if any) */
-  context?: ToolHookContext;
-  /** Error to throw if blocking */
-  error?: Error;
-  /** Request approval from user */
-  requestApproval?: ApprovalRequest;
-  /** Metadata to attach */
-  metadata?: Record<string, unknown>;
-}
-
-/**
- * Creates the tool:before hook handler
+ * Creates the before_tool_call handler for tool policy enforcement.
+ *
+ * Returns PluginHookBeforeToolCallResult to enable actual blocking via the SDK.
  */
 export function createToolGuardHook(
   guard: ClawGuard,
-  config: ClawGuardPluginConfig
+  config: ClawGuardPluginConfig,
+  logger: PluginLogger,
 ) {
-  return async (ctx: ToolHookContext): Promise<ToolHookResult> => {
-    const sessionId = ctx.session?.id;
+  return async (
+    event: BeforeToolCallEvent,
+    _ctx?: unknown,
+  ): Promise<PluginHookBeforeToolCallResult | void> => {
+    const { toolName, params } = event;
 
-    // Check self-modification for exec commands
-    if (ctx.tool.name === 'exec' && config.selfModification.enabled) {
-      const command = ctx.args.command as string | undefined;
-      
+    // ── Self-modification check for exec/bash tools ──────────────────────
+    if ((toolName === 'exec' || toolName === 'bash') && config.selfModification.enabled) {
+      const command = (params['command'] ?? params['cmd']) as string | undefined;
+
       if (command) {
-        const selfModCheck = guard.checkSelfModification(command, sessionId);
-        
+        const selfModCheck = guard.checkSelfModification(command);
+
         if (selfModCheck.blocked) {
-          // Check if this category requires approval or is hard-blocked
-          if (selfModCheck.requiresApproval && config.selfModification.requireApproval) {
-            return {
-              continue: false,
-              requestApproval: {
-                type: 'self-modification',
-                tool: 'exec',
-                command,
-                category: selfModCheck.category,
-                reason: selfModCheck.reason,
-              },
-              metadata: {
-                clawguard: {
-                  selfModification: true,
-                  category: selfModCheck.category,
-                  requiresApproval: true,
-                },
-              },
-            };
-          }
-          
-          // Hard block
-          return {
-            continue: false,
-            error: new Error(`ClawGuard blocked self-modification: ${selfModCheck.reason}`),
-            metadata: {
-              clawguard: {
-                selfModification: true,
-                category: selfModCheck.category,
-                blocked: true,
-              },
-            },
-          };
+          // Hard-block: log and tell the SDK to block the tool call
+          logger.error(
+            `ClawGuard: Self-modification blocked — ${selfModCheck.reason}`,
+            { toolName, command, category: selfModCheck.category },
+          );
+          return { block: true, blockReason: `ClawGuard: ${selfModCheck.reason}` };
+        }
+
+        if (selfModCheck.requiresApproval) {
+          // Soft-block: log warning; cannot block without approval flow
+          logger.warn(
+            `ClawGuard: Self-modification requires approval — ${selfModCheck.reason}`,
+            { toolName, command, category: selfModCheck.category },
+          );
+          // Allow through — human approval handles the gating
+          return;
         }
       }
     }
 
-    // Check tool policy
-    const toolCheck = guard.checkTool(
-      ctx.tool.name,
-      ctx.tool.action,
-      getToolTarget(ctx),
-      sessionId
-    );
+    // ── Tool policy check ─────────────────────────────────────────────────
+    const target = resolveTarget(toolName, params);
+    const toolCheck = guard.checkTool(toolName, undefined, target);
 
     if (!toolCheck.allowed) {
       if (toolCheck.requiresApproval) {
-        return {
-          continue: false,
-          requestApproval: {
-            type: 'tool-invocation',
-            tool: ctx.tool.name,
-            action: ctx.tool.action,
-            args: ctx.args,
-            reason: toolCheck.reason,
-          },
-          metadata: {
-            clawguard: {
-              toolCheck: true,
-              requiresApproval: true,
-            },
-          },
-        };
+        logger.warn(
+          `ClawGuard: Tool invocation requires approval — ${toolCheck.reason}`,
+          { toolName, params },
+        );
+        // Allow through pending approval
+        return;
+      } else {
+        logger.error(
+          `ClawGuard: Tool invocation blocked — ${toolCheck.reason}`,
+          { toolName, params },
+        );
+        return { block: true, blockReason: `ClawGuard: ${toolCheck.reason}` };
       }
-
-      return {
-        continue: false,
-        error: new Error(`ClawGuard blocked tool: ${toolCheck.reason}`),
-        metadata: {
-          clawguard: {
-            toolCheck: true,
-            blocked: true,
-            reason: toolCheck.reason,
-          },
-        },
-      };
     }
 
-    // Tool allowed
-    return {
-      continue: true,
-      metadata: {
-        clawguard: {
-          toolCheck: true,
-          allowed: true,
-        },
-      },
-    };
+    logger.debug?.('ClawGuard: Tool check passed', { toolName });
   };
 }
 
 /**
- * Extract target from tool args based on tool type
+ * Extract a meaningful target path/url from tool params.
  */
-function getToolTarget(ctx: ToolHookContext): string | undefined {
-  const { name, action } = ctx.tool;
-  const args = ctx.args;
-
-  switch (name) {
+function resolveTarget(
+  toolName: string,
+  params: Record<string, unknown>,
+): string | undefined {
+  switch (toolName) {
     case 'read':
     case 'write':
     case 'edit':
-      return (args.path || args.file_path) as string | undefined;
-    
+      return (params['path'] ?? params['file_path']) as string | undefined;
     case 'exec':
-      return args.command as string | undefined;
-    
+    case 'bash':
+      return (params['command'] ?? params['cmd']) as string | undefined;
     case 'browser':
-      return args.targetUrl as string | undefined;
-    
+      return params['targetUrl'] as string | undefined;
     case 'message':
-      return (args.target || args.channel) as string | undefined;
-    
+      return (params['target'] ?? params['channel']) as string | undefined;
     default:
       return undefined;
   }

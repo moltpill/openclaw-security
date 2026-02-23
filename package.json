@@ -43,5 +43,10 @@
     "dist",
     "README.md",
     "LICENSE"
-  ]
+  ],
+  "openclaw": {
+    "extensions": [
+      "./dist/plugin/index.js"
+    ]
+  }
 }

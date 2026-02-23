@@ -1,0 +1,65 @@
+{
+  "id": "clawguard",
+  "name": "ClawGuard Security",
+  "version": "0.1.0",
+  "description": "Security layer for OpenClaw agents - injection detection, secret scanning, enclave protection, and audit logging",
+  "entry": "./dist/plugin/index.js",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": true,
+    "properties": {
+      "shield": {
+        "type": "object",
+        "description": "Injection detection settings",
+        "properties": {
+          "enabled": { "type": "boolean", "default": true },
+          "sensitivity": { "type": "string", "enum": ["low", "medium", "high"], "default": "medium" },
+          "blockOnDetection": { "type": "boolean", "default": false }
+        }
+      },
+      "scanner": {
+        "type": "object",
+        "description": "Secret/credential scanning settings",
+        "properties": {
+          "enabled": { "type": "boolean", "default": true },
+          "onDetection": { "type": "string", "enum": ["block", "warn", "redact", "allow"], "default": "warn" }
+        }
+      },
+      "enclave": {
+        "type": "object",
+        "description": "Protected file settings",
+        "properties": {
+          "enabled": { "type": "boolean", "default": true },
+          "protectedFiles": {
+            "type": "array",
+            "items": { "type": "string" },
+            "default": ["SOUL.md", "USER.md", "MEMORY.md", "secrets/*", ".env*"]
+          },
+          "requireApproval": { "type": "boolean", "default": true }
+        }
+      },
+      "selfModification": {
+        "type": "object",
+        "description": "Self-modification guard settings",
+        "properties": {
+          "enabled": { "type": "boolean", "default": true },
+          "requireApproval": { "type": "boolean", "default": true }
+        }
+      },
+      "audit": {
+        "type": "object",
+        "description": "Audit logging settings",
+        "properties": {
+          "enabled": { "type": "boolean", "default": true },
+          "retention": {
+            "type": "object",
+            "properties": {
+              "maxAgeDays": { "type": "number", "default": 30 },
+              "maxSizeMb": { "type": "number", "default": 100 }
+            }
+          }
+        }
+      }
+    }
+  }
+}

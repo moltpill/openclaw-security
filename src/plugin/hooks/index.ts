@@ -1,28 +1,28 @@
 /**
  * Plugin Hooks Index
- * 
- * Re-exports all hook factories and their types for the ClawGuard plugin.
+ *
+ * Re-exports all hook factories and their event types for the ClawGuard plugin.
+ *
+ * Hook names updated to match the real OpenClaw SDK:
+ *   message:before → message_received
+ *   tool:before    → before_tool_call
+ *   file:before    → before_tool_call (filtered for file tools)
+ *
+ * Return types:
+ *   createToolGuardHook and createFileWatchHook return
+ *   PluginHookBeforeToolCallResult | void, enabling actual blocking via the SDK.
  */
 
-// Message Shield Hook
-export { 
+export {
   createMessageShieldHook,
-  type MessageHookContext,
-  type MessageHookResult,
+  type MessageReceivedEvent,
 } from './message-shield';
 
-// Tool Guard Hook
 export {
   createToolGuardHook,
-  type ToolHookContext,
-  type ToolHookResult,
-  type ApprovalRequest,
+  type BeforeToolCallEvent,
 } from './tool-guard';
 
-// File Watch Hook
 export {
   createFileWatchHook,
-  type FileHookContext,
-  type FileHookResult,
-  type EnclaveApprovalRequest,
 } from './file-watch';
