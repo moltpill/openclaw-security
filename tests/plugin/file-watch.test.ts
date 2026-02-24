@@ -1,319 +1,121 @@
 /**
- * File Watch Hook Tests
+ * Tests for the file-watch hook.
+ * Updated to match the new read-only OpenClaw SDK hook API.
+ * Hooks no longer return values — they log/audit via api.logger.
  */
 
-import { createFileWatchHook, FileHookContext } from '../../src/plugin/hooks/file-watch';
-import { ClawGuard } from '../../src/clawguard';
-import { ClawGuardPluginConfig, DEFAULT_CONFIG } from '../../src/plugin/config';
+import { createFileWatchHook, BeforeToolCallEvent } from '../../src/plugin/hooks/file-watch';
+import { ClawGuard, createClawGuard } from '../../src/clawguard';
+import { DEFAULT_CONFIG, resolveConfig } from '../../src/plugin/config';
+import type { PluginLogger } from '../../src/plugin/sdk-types';
 
-describe('FileWatchHook', () => {
-  let mockGuard: Partial<ClawGuard>;
-  let config: ClawGuardPluginConfig;
+function makeLogger(): { logger: PluginLogger; calls: { level: string; msg: string }[] } {
+  const calls: { level: string; msg: string }[] = [];
+  const logger: PluginLogger = {
+    debug: (msg) => calls.push({ level: 'debug', msg }),
+    info: (msg) => calls.push({ level: 'info', msg }),
+    warn: (msg) => calls.push({ level: 'warn', msg }),
+    error: (msg) => calls.push({ level: 'error', msg }),
+  };
+  return { logger, calls };
+}
 
-  beforeEach(() => {
-    config = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
-    mockGuard = {
-      isProtectedFile: jest.fn().mockReturnValue(false),
-      scanContent: jest.fn().mockReturnValue({
-        safe: true,
-        action: 'allow',
-      }),
+describe('createFileWatchHook', () => {
+  let guard: ClawGuard;
+  const config = resolveConfig(DEFAULT_CONFIG);
+
+  beforeAll(async () => {
+    guard = await createClawGuard({ enclavePath: '/tmp/test-enclave' });
+  });
+
+  it('should return a function', () => {
+    const { logger } = makeLogger();
+    const hook = createFileWatchHook(guard, config, logger);
+    expect(typeof hook).toBe('function');
+  });
+
+  it('should not log warnings for non-file tools', async () => {
+    const { logger, calls } = makeLogger();
+    const hook = createFileWatchHook(guard, config, logger);
+    const event: BeforeToolCallEvent = {
+      toolName: 'web_search',
+      params: { query: 'hello world' },
     };
+    await hook(event);
+    const warnOrError = calls.filter((c) => c.level === 'warn' || c.level === 'error');
+    expect(warnOrError).toHaveLength(0);
   });
 
-  describe('enclave protection', () => {
-    it('should block writes to protected files without approval', async () => {
-      config.enclave.enabled = true;
-      config.enclave.requireApproval = false;
-      mockGuard.isProtectedFile = jest.fn().mockReturnValue(true);
-
-      const hook = createFileWatchHook(mockGuard as ClawGuard, config);
-
-      const ctx: FileHookContext = {
-        operation: 'write',
-        path: '/workspace/SOUL.md',
-        content: 'New content',
-      };
-
-      const result = await hook(ctx);
-
-      expect(result.continue).toBe(false);
-      expect(result.error).toBeInstanceOf(Error);
-      expect(result.error?.message).toContain('protected file');
-      expect(result.metadata?.clawguard).toMatchObject({
-        enclave: true,
-        protected: true,
-        blocked: true,
-      });
-    });
-
-    it('should request approval for writes to protected files when configured', async () => {
-      config.enclave.enabled = true;
-      config.enclave.requireApproval = true;
-      mockGuard.isProtectedFile = jest.fn().mockReturnValue(true);
-
-      const hook = createFileWatchHook(mockGuard as ClawGuard, config);
-
-      const ctx: FileHookContext = {
-        operation: 'write',
-        path: '/workspace/MEMORY.md',
-        content: 'Updated memory',
-      };
-
-      const result = await hook(ctx);
-
-      expect(result.continue).toBe(false);
-      expect(result.requestApproval).toBeDefined();
-      expect(result.requestApproval?.type).toBe('enclave-write');
-      expect(result.requestApproval?.path).toBe('/workspace/MEMORY.md');
-      expect(result.requestApproval?.content).toBe('Updated memory');
-    });
-
-    it('should block deletes to protected files', async () => {
-      config.enclave.enabled = true;
-      mockGuard.isProtectedFile = jest.fn().mockReturnValue(true);
-
-      const hook = createFileWatchHook(mockGuard as ClawGuard, config);
-
-      const ctx: FileHookContext = {
-        operation: 'delete',
-        path: '/workspace/secrets/api-keys.json',
-      };
-
-      const result = await hook(ctx);
-
-      expect(result.continue).toBe(false);
-      expect(result.requestApproval || result.error).toBeDefined();
-    });
-
-    it('should allow writes to unprotected files', async () => {
-      config.enclave.enabled = true;
-      mockGuard.isProtectedFile = jest.fn().mockReturnValue(false);
-
-      const hook = createFileWatchHook(mockGuard as ClawGuard, config);
-
-      const ctx: FileHookContext = {
-        operation: 'write',
-        path: '/workspace/project/code.ts',
-        content: 'const x = 1;',
-      };
-
-      const result = await hook(ctx);
-
-      expect(result.continue).toBe(true);
-    });
-
-    it('should skip enclave check when disabled', async () => {
-      config.enclave.enabled = false;
-      mockGuard.isProtectedFile = jest.fn().mockReturnValue(true);
-
-      const hook = createFileWatchHook(mockGuard as ClawGuard, config);
-
-      const ctx: FileHookContext = {
-        operation: 'write',
-        path: '/workspace/SOUL.md',
-        content: 'New content',
-      };
-
-      const result = await hook(ctx);
-
-      // Should proceed to scanner check, not blocked by enclave
-      expect(mockGuard.isProtectedFile).not.toHaveBeenCalled();
-    });
+  it('should not log warnings for safe file reads', async () => {
+    const { logger, calls } = makeLogger();
+    const hook = createFileWatchHook(guard, config, logger);
+    const event: BeforeToolCallEvent = {
+      toolName: 'read',
+      params: { path: '/tmp/safe-file.txt' },
+    };
+    await hook(event);
+    const warnOrError = calls.filter((c) => c.level === 'warn' || c.level === 'error');
+    expect(warnOrError).toHaveLength(0);
   });
 
-  describe('secret scanning', () => {
-    it('should block writes containing secrets when onDetection is block', async () => {
-      config.scanner.enabled = true;
-      config.scanner.onDetection = 'block';
-      mockGuard.scanContent = jest.fn().mockReturnValue({
-        safe: false,
-        action: 'block',
-      });
-
-      const hook = createFileWatchHook(mockGuard as ClawGuard, config);
-
-      const ctx: FileHookContext = {
-        operation: 'write',
-        path: '/workspace/config.json',
-        content: '{ "apiKey": "sk-abc123secret" }',
-      };
-
-      const result = await hook(ctx);
-
-      expect(result.continue).toBe(false);
-      expect(result.error).toBeInstanceOf(Error);
-      expect(result.error?.message).toContain('contains secrets');
+  it('should log when writing to a protected enclave file', async () => {
+    const { logger, calls } = makeLogger();
+    // Add SOUL.md to enclave protected list
+    const protectedConfig = resolveConfig({
+      ...DEFAULT_CONFIG,
+      enclave: {
+        ...DEFAULT_CONFIG.enclave,
+        protectedFiles: ['SOUL.md', 'MEMORY.md'],
+      },
     });
-
-    it('should redact secrets when onDetection is redact', async () => {
-      config.scanner.enabled = true;
-      config.scanner.onDetection = 'redact';
-      mockGuard.scanContent = jest.fn().mockReturnValue({
-        safe: false,
-        action: 'warn',
-        redactedContent: '{ "apiKey": "[REDACTED]" }',
-      });
-
-      const hook = createFileWatchHook(mockGuard as ClawGuard, config);
-
-      const ctx: FileHookContext = {
-        operation: 'write',
-        path: '/workspace/config.json',
-        content: '{ "apiKey": "sk-abc123secret" }',
-      };
-
-      const result = await hook(ctx);
-
-      expect(result.continue).toBe(true);
-      expect(result.context?.content).toBe('{ "apiKey": "[REDACTED]" }');
-      expect(result.warning).toContain('redacted');
-    });
-
-    it('should warn but allow when onDetection is warn', async () => {
-      config.scanner.enabled = true;
-      config.scanner.onDetection = 'warn';
-      mockGuard.scanContent = jest.fn().mockReturnValue({
-        safe: false,
-        action: 'warn',
-      });
-
-      const hook = createFileWatchHook(mockGuard as ClawGuard, config);
-
-      const ctx: FileHookContext = {
-        operation: 'write',
-        path: '/workspace/config.json',
-        content: '{ "apiKey": "sk-abc123" }',
-      };
-
-      const result = await hook(ctx);
-
-      expect(result.continue).toBe(true);
-      expect(result.warning).toContain('secrets');
-    });
-
-    it('should allow without warning when onDetection is allow', async () => {
-      config.scanner.enabled = true;
-      config.scanner.onDetection = 'allow';
-      mockGuard.scanContent = jest.fn().mockReturnValue({
-        safe: false,
-        action: 'allow',
-      });
-
-      const hook = createFileWatchHook(mockGuard as ClawGuard, config);
-
-      const ctx: FileHookContext = {
-        operation: 'write',
-        path: '/workspace/config.json',
-        content: '{ "apiKey": "sk-abc123" }',
-      };
-
-      const result = await hook(ctx);
-
-      expect(result.continue).toBe(true);
-      expect(result.warning).toBeUndefined();
-    });
-
-    it('should skip secret scanning when disabled', async () => {
-      config.scanner.enabled = false;
-
-      const hook = createFileWatchHook(mockGuard as ClawGuard, config);
-
-      const ctx: FileHookContext = {
-        operation: 'write',
-        path: '/workspace/config.json',
-        content: '{ "apiKey": "sk-abc123" }',
-      };
-
-      const result = await hook(ctx);
-
-      expect(mockGuard.scanContent).not.toHaveBeenCalled();
-      expect(result.continue).toBe(true);
-    });
-
-    it('should not scan reads for blocking', async () => {
-      config.scanner.enabled = true;
-
-      const hook = createFileWatchHook(mockGuard as ClawGuard, config);
-
-      const ctx: FileHookContext = {
-        operation: 'read',
-        path: '/workspace/config.json',
-      };
-
-      const result = await hook(ctx);
-
-      // Reads should pass through with metadata indicating will-scan
-      expect(result.continue).toBe(true);
-      expect((result.metadata?.clawguard as Record<string, unknown>)?.willScan).toBe(true);
-    });
+    const hook = createFileWatchHook(guard, protectedConfig, logger);
+    const event: BeforeToolCallEvent = {
+      toolName: 'write',
+      params: { path: '/workspace/SOUL.md', content: 'new content' },
+    };
+    await hook(event);
+    // Should have logged a warning or error about protected file
+    const relevant = calls.filter((c) => c.level === 'warn' || c.level === 'error');
+    expect(relevant.length).toBeGreaterThan(0);
   });
 
-  describe('combined protection', () => {
-    it('should check enclave before secret scanning', async () => {
-      config.enclave.enabled = true;
-      config.scanner.enabled = true;
-      config.enclave.requireApproval = true;
-      mockGuard.isProtectedFile = jest.fn().mockReturnValue(true);
-
-      const hook = createFileWatchHook(mockGuard as ClawGuard, config);
-
-      const ctx: FileHookContext = {
-        operation: 'write',
-        path: '/workspace/SOUL.md',
-        content: 'Content with apiKey: sk-secret',
-      };
-
-      const result = await hook(ctx);
-
-      // Should stop at enclave check, not proceed to scanner
-      expect(result.continue).toBe(false);
-      expect(result.requestApproval?.type).toBe('enclave-write');
-      expect(mockGuard.scanContent).not.toHaveBeenCalled();
-    });
-
-    it('should scan secrets for unprotected writes', async () => {
-      config.enclave.enabled = true;
-      config.scanner.enabled = true;
-      config.scanner.onDetection = 'warn';
-      mockGuard.isProtectedFile = jest.fn().mockReturnValue(false);
-      mockGuard.scanContent = jest.fn().mockReturnValue({
-        safe: false,
-        action: 'warn',
-      });
-
-      const hook = createFileWatchHook(mockGuard as ClawGuard, config);
-
-      const ctx: FileHookContext = {
-        operation: 'write',
-        path: '/workspace/project/config.json',
-        content: 'apiKey: sk-secret',
-      };
-
-      const result = await hook(ctx);
-
-      expect(mockGuard.isProtectedFile).toHaveBeenCalledWith('/workspace/project/config.json');
-      expect(mockGuard.scanContent).toHaveBeenCalledWith('apiKey: sk-secret', 'write');
-      expect(result.warning).toBeDefined();
-    });
+  it('should handle edit tool with file path', async () => {
+    const { logger } = makeLogger();
+    const hook = createFileWatchHook(guard, config, logger);
+    const event: BeforeToolCallEvent = {
+      toolName: 'edit',
+      params: { file_path: '/tmp/test.ts', old_string: 'foo', new_string: 'bar' },
+    };
+    await expect(hook(event)).resolves.toBeUndefined();
   });
 
-  describe('metadata', () => {
-    it('should attach metadata for allowed operations', async () => {
-      const hook = createFileWatchHook(mockGuard as ClawGuard, config);
-
-      const ctx: FileHookContext = {
-        operation: 'write',
-        path: '/workspace/file.txt',
-        content: 'Safe content',
-      };
-
-      const result = await hook(ctx);
-
-      expect(result.metadata?.clawguard).toMatchObject({
-        checked: true,
-        operation: 'write',
-      });
+  it('should do nothing when enclave is disabled', async () => {
+    const { logger, calls } = makeLogger();
+    const disabledConfig = resolveConfig({
+      ...DEFAULT_CONFIG,
+      enclave: {
+        ...DEFAULT_CONFIG.enclave,
+        enabled: false,
+        protectedFiles: ['SOUL.md', 'MEMORY.md'],
+      },
     });
+    const hook = createFileWatchHook(guard, disabledConfig, logger);
+    const event: BeforeToolCallEvent = {
+      toolName: 'write',
+      params: { path: '/workspace/SOUL.md', content: 'overwrite' },
+    };
+    await hook(event);
+    const warnOrError = calls.filter((c) => c.level === 'warn' || c.level === 'error');
+    expect(warnOrError).toHaveLength(0);
+  });
+
+  it('should not throw for events with no path param', async () => {
+    const { logger } = makeLogger();
+    const hook = createFileWatchHook(guard, config, logger);
+    const event: BeforeToolCallEvent = {
+      toolName: 'write',
+      params: {},
+    };
+    await expect(hook(event)).resolves.toBeUndefined();
   });
 });

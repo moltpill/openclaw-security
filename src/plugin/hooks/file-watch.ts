@@ -1,179 +1,147 @@
 /**
  * File Watch Hook
- * 
- * Implements the file:before hook for protecting enclave files
- * and scanning file content for secrets.
+ *
+ * Handles the before_tool_call hook for file-related tools, protecting
+ * enclave files and scanning content for secrets.
+ *
+ * This hook is called from the before_tool_call handler in plugin/index.ts
+ * after filtering for file-related tool names.
+ *
+ * Covered tools: exec, read, write, edit, bash, read_file, write_file
+ *
+ * BLOCKING SUPPORT:
+ *   The OpenClaw SDK before_tool_call hook supports returning
+ *   { block: true, blockReason } to prevent the tool from executing.
+ *
+ *   Hard-block cases (no approval configured):
+ *     - Write to a protected enclave file
+ *     - File write containing secrets with onDetection='block'
+ *
+ *   Soft cases (logged + allowed through):
+ *     - Write to protected enclave file when requireApproval=true
+ *     - Secret detected with onDetection='warn' or 'redact'
  */
 
 import { ClawGuard } from '../../clawguard';
 import { ClawGuardPluginConfig } from '../config';
+import type { PluginLogger, PluginHookBeforeToolCallResult } from '../sdk-types';
 
-/**
- * Context provided by OpenClaw for file:before hook
- */
-export interface FileHookContext {
-  operation: 'read' | 'write' | 'delete';
-  path: string;
-  content?: string;
-  session?: {
-    id: string;
-  };
+export interface BeforeToolCallEvent {
+  toolName: string;
+  params: Record<string, unknown>;
 }
 
 /**
- * Enclave approval request
- */
-export interface EnclaveApprovalRequest {
-  type: 'enclave-write';
-  path: string;
-  content: string;
-  reason: string;
-}
-
-/**
- * Result returned from the hook
- */
-export interface FileHookResult {
-  /** Whether to continue with the file operation */
-  continue: boolean;
-  /** Modified context (if any) */
-  context?: FileHookContext;
-  /** Error to throw if blocking */
-  error?: Error;
-  /** Request approval from user */
-  requestApproval?: EnclaveApprovalRequest;
-  /** Warning message to log */
-  warning?: string;
-  /** Metadata to attach */
-  metadata?: Record<string, unknown>;
-}
-
-/**
- * Creates the file:before hook handler
+ * Creates the file-watch handler for enclave protection + secret scanning.
+ * Called only for file-related tools (filtered in plugin/index.ts).
  */
 export function createFileWatchHook(
   guard: ClawGuard,
-  config: ClawGuardPluginConfig
+  config: ClawGuardPluginConfig,
+  logger: PluginLogger,
 ) {
-  return async (ctx: FileHookContext): Promise<FileHookResult> => {
-    const sessionId = ctx.session?.id;
+  return async (
+    event: BeforeToolCallEvent,
+    _ctx?: unknown,
+  ): Promise<PluginHookBeforeToolCallResult | void> => {
+    const { toolName, params } = event;
 
-    // Check enclave protection for writes and deletes
-    if (ctx.operation === 'write' || ctx.operation === 'delete') {
-      if (config.enclave.enabled && guard.isProtectedFile(ctx.path)) {
+    // Resolve the file path from params
+    const filePath = resolveFilePath(toolName, params);
+    const content = (params['content'] ?? params['new_string'] ?? params['newText']) as
+      | string
+      | undefined;
+    const isWrite = isWriteOperation(toolName, params);
+
+    // ── Enclave protection ────────────────────────────────────────────────
+    if (filePath && isWrite && config.enclave.enabled) {
+      if (guard.isProtectedFile(filePath)) {
         if (config.enclave.requireApproval) {
+          // Soft: log and let through — approval flow handles the gate
+          logger.warn(
+            `ClawGuard: Write to protected enclave file detected — ${filePath}`,
+            { toolName, filePath, requiresApproval: true },
+          );
+          return;
+        } else {
+          // Hard block: deny the write entirely
+          logger.error(
+            `ClawGuard: Write to protected enclave file blocked — ${filePath}`,
+            { toolName, filePath, blocked: true },
+          );
           return {
-            continue: false,
-            requestApproval: {
-              type: 'enclave-write',
-              path: ctx.path,
-              content: ctx.content || '',
-              reason: `Modification to protected file: ${ctx.path}`,
-            },
-            metadata: {
-              clawguard: {
-                enclave: true,
-                protected: true,
-                requiresApproval: true,
-              },
-            },
+            block: true,
+            blockReason: `ClawGuard: Write to protected enclave file: ${filePath}`,
           };
         }
-
-        // Hard block without approval option
-        return {
-          continue: false,
-          error: new Error(`ClawGuard: Cannot modify protected file: ${ctx.path}`),
-          metadata: {
-            clawguard: {
-              enclave: true,
-              protected: true,
-              blocked: true,
-            },
-          },
-        };
       }
     }
 
-    // Scan content for secrets on write
-    if (ctx.operation === 'write' && ctx.content && config.scanner.enabled) {
-      const scanResult = guard.scanContent(ctx.content, 'write');
+    // ── Secret scanner ────────────────────────────────────────────────────
+    if (content && isWrite && config.scanner.enabled) {
+      const scanResult = guard.scanContent(content, 'write');
 
       if (!scanResult.safe) {
         switch (config.scanner.onDetection) {
           case 'block':
+            logger.error(
+              `ClawGuard: File write contains secrets — blocked (${filePath ?? toolName})`,
+              { toolName, filePath },
+            );
             return {
-              continue: false,
-              error: new Error('ClawGuard: File write blocked - contains secrets'),
-              metadata: {
-                clawguard: {
-                  secretScan: true,
-                  blocked: true,
-                },
-              },
+              block: true,
+              blockReason: `ClawGuard: File write contains secrets: ${filePath ?? toolName}`,
             };
-
-          case 'redact':
-            if (scanResult.redactedContent) {
-              return {
-                continue: true,
-                context: {
-                  ...ctx,
-                  content: scanResult.redactedContent,
-                },
-                warning: 'ClawGuard: Secrets were redacted from file content',
-                metadata: {
-                  clawguard: {
-                    secretScan: true,
-                    redacted: true,
-                  },
-                },
-              };
-            }
-            break;
 
           case 'warn':
-            return {
-              continue: true,
-              warning: 'ClawGuard: File write contains potential secrets',
-              metadata: {
-                clawguard: {
-                  secretScan: true,
-                  warned: true,
-                },
-              },
-            };
+            logger.warn(
+              `ClawGuard: File write contains potential secrets — ${filePath ?? toolName}`,
+              { toolName, filePath },
+            );
+            return;
 
-          case 'allow':
+          case 'redact':
+            // Cannot modify content in the hook without returning modified params.
+            // Log the violation and allow through — content is logged for audit.
+            logger.warn(
+              `ClawGuard: File write would have been redacted — ${filePath ?? toolName}`,
+              { toolName, filePath },
+            );
+            // TODO: return { params: { ...params, content: scanResult.redactedContent } }
+            // once the plugin config surfaces redactedContent reliably.
+            return;
+
           default:
-            // Fall through to allow
             break;
         }
       }
     }
 
-    // Scan content for secrets on read (for logging purposes)
-    if (ctx.operation === 'read' && config.scanner.enabled) {
-      // Just attach metadata that scanning will happen on the content
-      return {
-        continue: true,
-        metadata: {
-          clawguard: {
-            willScan: true,
-          },
-        },
-      };
-    }
-
-    // All clear
-    return {
-      continue: true,
-      metadata: {
-        clawguard: {
-          checked: true,
-          operation: ctx.operation,
-        },
-      },
-    };
+    logger.debug?.('ClawGuard: File tool checked, no issues', { toolName, filePath });
   };
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function resolveFilePath(
+  toolName: string,
+  params: Record<string, unknown>,
+): string | undefined {
+  return (
+    params['path'] ??
+    params['file_path'] ??
+    params['filePath'] ??
+    (toolName === 'exec' || toolName === 'bash' ? params['command'] : undefined)
+  ) as string | undefined;
+}
+
+function isWriteOperation(toolName: string, params: Record<string, unknown>): boolean {
+  if (['write', 'write_file'].includes(toolName)) return true;
+  if (['edit'].includes(toolName)) return true;
+  if (['exec', 'bash'].includes(toolName)) {
+    // Heuristic: contains write-like shell commands
+    const cmd = (params['command'] ?? params['cmd'] ?? '') as string;
+    return /\b(echo|tee|cp|mv|rm|cat >|>|>>|\bwrite\b|\binstall\b)\b/i.test(cmd);
+  }
+  return false;
 }
