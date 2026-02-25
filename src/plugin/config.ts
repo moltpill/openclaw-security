@@ -73,6 +73,27 @@ export const SelfModificationConfigSchema = z.object({
 }).optional();
 
 /**
+ * Command allowlist configuration
+ *
+ * Commands matching allowlist patterns bypass self-modification guard
+ * and optionally auto-elevate (inject `elevated: true` into exec params).
+ *
+ * Patterns use glob-like matching: `*` matches anything.
+ * Examples:
+ *   "tailscale status"         — exact match
+ *   "tailscale *"              — any tailscale subcommand
+ *   "sudo tailscale *"         — any sudo tailscale command (auto-elevated)
+ *   "sudo systemctl restart openclaw-*" — restart our own services
+ */
+export const AllowlistConfigSchema = z.object({
+  enabled: z.boolean().default(true),
+  /** Commands that bypass the self-modification guard */
+  commands: z.array(z.string()).default([]),
+  /** Commands that auto-inject `elevated: true` (for sudo commands) */
+  elevate: z.array(z.string()).default([]),
+}).optional();
+
+/**
  * Audit logging configuration
  */
 export const AuditConfigSchema = z.object({
@@ -92,6 +113,7 @@ export const ClawGuardPluginConfigSchema = z.object({
   scanner: ScannerConfigSchema,
   enclave: EnclaveConfigSchema,
   selfModification: SelfModificationConfigSchema,
+  allowlist: AllowlistConfigSchema,
   audit: AuditConfigSchema,
 });
 
@@ -134,6 +156,11 @@ export interface ClawGuardPluginConfig {
     enabled: boolean;
     requireApproval: boolean;
     blockedCategories: BlockedCategory[];
+  };
+  allowlist: {
+    enabled: boolean;
+    commands: string[];
+    elevate: string[];
   };
   audit: {
     enabled: boolean;
@@ -186,6 +213,11 @@ export const DEFAULT_CONFIG: ClawGuardPluginConfig = {
     requireApproval: true,
     blockedCategories: ['gateway-control', 'process-control'],
   },
+  allowlist: {
+    enabled: true,
+    commands: [],
+    elevate: [],
+  },
   audit: {
     enabled: true,
     retention: {
@@ -224,6 +256,12 @@ export function resolveConfig(userConfig: ClawGuardPluginConfigInput = {}): Claw
       ...DEFAULT_CONFIG.selfModification,
       ...userConfig.selfModification,
       blockedCategories: userConfig.selfModification?.blockedCategories ?? DEFAULT_CONFIG.selfModification.blockedCategories,
+    },
+    allowlist: {
+      ...DEFAULT_CONFIG.allowlist,
+      ...userConfig.allowlist,
+      commands: userConfig.allowlist?.commands ?? DEFAULT_CONFIG.allowlist.commands,
+      elevate: userConfig.allowlist?.elevate ?? DEFAULT_CONFIG.allowlist.elevate,
     },
     audit: {
       ...DEFAULT_CONFIG.audit,

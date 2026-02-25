@@ -44,6 +44,13 @@ export type {
   SelfModificationCategory 
 } from './guards/self-modification-guard';
 
+// Command Allowlist
+export { CommandAllowlist } from './guards/command-allowlist';
+export type {
+  AllowlistConfig,
+  AllowlistCheckResult,
+} from './guards/command-allowlist';
+
 // Approval workflow
 export { ApprovalChannel, ApprovalManager } from './approval';
 export type {

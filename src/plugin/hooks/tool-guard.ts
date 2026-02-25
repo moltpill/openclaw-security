@@ -2,20 +2,22 @@
  * Tool Guard Hook
  *
  * Handles the before_tool_call hook for checking tool invocations
- * against security policies and self-modification guards.
+ * against security policies, command allowlists, and self-modification guards.
  *
- * BLOCKING SUPPORT:
- *   The OpenClaw SDK processes before_tool_call as a modifying hook.
- *   Returning { block: true, blockReason: '...' } prevents the tool
- *   from executing. ClawGuard uses this for hard-block categories.
+ * EXECUTION ORDER:
+ *   1. Allowlist check — if command matches, bypass self-mod guard entirely.
+ *      If the match is an `elevate` pattern, auto-inject `elevated: true`.
+ *   2. Self-modification guard — hard-block or warn for dangerous commands.
+ *   3. Tool policy check — general tool access control.
  *
- *   Soft violations (requiresApproval) are logged at warn level and
- *   allowed through — blocking without the approval flow would break
- *   legitimate agent operations that simply need human sign-off.
+ * BLOCKING:
+ *   Return { block: true, blockReason } → OpenClaw prevents tool execution.
+ *   Return { params: { ...params, elevated: true } } → auto-elevate.
  */
 
 import { ClawGuard } from '../../clawguard';
 import { ClawGuardPluginConfig } from '../config';
+import { CommandAllowlist } from '../../guards/command-allowlist';
 import type { PluginLogger, PluginHookBeforeToolCallResult } from '../sdk-types';
 
 /**
@@ -28,49 +30,70 @@ export interface BeforeToolCallEvent {
 
 /**
  * Creates the before_tool_call handler for tool policy enforcement.
- *
- * Returns PluginHookBeforeToolCallResult to enable actual blocking via the SDK.
  */
 export function createToolGuardHook(
   guard: ClawGuard,
   config: ClawGuardPluginConfig,
   logger: PluginLogger,
 ) {
+  // Build the allowlist once at hook creation time
+  const allowlist = new CommandAllowlist(config.allowlist);
+
   return async (
     event: BeforeToolCallEvent,
     _ctx?: unknown,
   ): Promise<PluginHookBeforeToolCallResult | void> => {
     const { toolName, params } = event;
 
-    // ── Self-modification check for exec/bash tools ──────────────────────
-    if ((toolName === 'exec' || toolName === 'bash') && config.selfModification.enabled) {
+    // Only exec/bash commands need allowlist + self-mod checking
+    if (toolName === 'exec' || toolName === 'bash') {
       const command = (params['command'] ?? params['cmd']) as string | undefined;
 
       if (command) {
-        const selfModCheck = guard.checkSelfModification(command);
+        // ── 1. Allowlist check ───────────────────────────────────────────
+        const allowlistResult = allowlist.check(command);
 
-        if (selfModCheck.blocked) {
-          // Hard-block: log and tell the SDK to block the tool call
-          logger.error(
-            `ClawGuard: Self-modification blocked — ${selfModCheck.reason}`,
-            { toolName, command, category: selfModCheck.category },
+        if (allowlistResult.allowed) {
+          logger.info(
+            `ClawGuard: Command allowlisted — ${allowlistResult.matchedPattern}`,
+            { toolName, command, autoElevate: allowlistResult.autoElevate },
           );
-          return { block: true, blockReason: `ClawGuard: ${selfModCheck.reason}` };
+
+          if (allowlistResult.autoElevate) {
+            // Inject elevated: true into the tool params
+            return {
+              params: { ...params, elevated: true },
+            };
+          }
+
+          // Allowed, no elevation needed — skip all further checks
+          return;
         }
 
-        if (selfModCheck.requiresApproval) {
-          // Soft-block: log warning; cannot block without approval flow
-          logger.warn(
-            `ClawGuard: Self-modification requires approval — ${selfModCheck.reason}`,
-            { toolName, command, category: selfModCheck.category },
-          );
-          // Allow through — human approval handles the gating
-          return;
+        // ── 2. Self-modification check ───────────────────────────────────
+        if (config.selfModification.enabled) {
+          const selfModCheck = guard.checkSelfModification(command);
+
+          if (selfModCheck.blocked) {
+            logger.error(
+              `ClawGuard: Self-modification blocked — ${selfModCheck.reason}`,
+              { toolName, command, category: selfModCheck.category },
+            );
+            return { block: true, blockReason: `ClawGuard: ${selfModCheck.reason}` };
+          }
+
+          if (selfModCheck.requiresApproval) {
+            logger.warn(
+              `ClawGuard: Self-modification requires approval — ${selfModCheck.reason}`,
+              { toolName, command, category: selfModCheck.category },
+            );
+            return;
+          }
         }
       }
     }
 
-    // ── Tool policy check ─────────────────────────────────────────────────
+    // ── 3. Tool policy check ──────────────────────────────────────────────
     const target = resolveTarget(toolName, params);
     const toolCheck = guard.checkTool(toolName, undefined, target);
 
@@ -80,7 +103,6 @@ export function createToolGuardHook(
           `ClawGuard: Tool invocation requires approval — ${toolCheck.reason}`,
           { toolName, params },
         );
-        // Allow through pending approval
         return;
       } else {
         logger.error(

@@ -46,6 +46,25 @@
           "requireApproval": { "type": "boolean", "default": true }
         }
       },
+      "allowlist": {
+        "type": "object",
+        "description": "Pre-approved command patterns that bypass self-modification guard and optionally auto-elevate",
+        "properties": {
+          "enabled": { "type": "boolean", "default": true },
+          "commands": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Glob patterns for commands that bypass the self-modification guard",
+            "default": []
+          },
+          "elevate": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Glob patterns for commands that auto-inject elevated: true (typically sudo commands)",
+            "default": []
+          }
+        }
+      },
       "audit": {
         "type": "object",
         "description": "Audit logging settings",
